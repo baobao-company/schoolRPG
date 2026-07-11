@@ -1,405 +1,74 @@
 #ifndef BAG_H
 #define BAG_H
 
+#include "Item.h"
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <memory>
 
-// ÎïÆ·»ùÀà
-class Item {
-public:
-    enum ItemType {
-        FOOD,       // Ê³Îï
-        WEAPON,     // ÎäÆ÷
-        MEDICINE,   // Ò©Æ·
-        MATERIAL,   // ²ÄÁÏ ¡û ĞÂÔöÀàĞÍ
-        NONE
-    };
 
-    Item(const std::string& name, ItemType type, int quantity = 1)
-        : m_name(name), m_type(type), m_quantity(quantity), m_description("") {}
 
-    virtual ~Item() = default;
+class Bag 
+{
+    private:
+    std::string m_ownerName;     // èƒŒåŒ…æŒæœ‰è€…åç§°
+    int m_capacity;              // èƒŒåŒ…å®¹é‡ä¸Šé™
+    std::vector<Item*> m_items;  // ç‰©å“å­˜å‚¨å®¹å™¨
+    public:
+    Bag(const std::string& ownerName = "Player", int capacity = 20);
+    ~Bag();
+    //ç¦ç”¨æ‹·è´
+    Bag(const Bag&) = delete;
+    Bag& operator=(const Bag&) = delete;
 
-    std::string getName() const { return m_name; }
-    ItemType getType() const { return m_type; }
-    int getQuantity() const { return m_quantity; }
-    std::string getDescription() const { return m_description; }
+    //ç‰©å“ç®¡ç†
+    bool addItem(Item* item);
     
-    void setQuantity(int qty) { m_quantity = qty; }
-    void addQuantity(int qty) { m_quantity += qty; }
-    void setDescription(const std::string& desc) { m_description = desc; }
+    //æ·»åŠ ç‰©å“ï¼ˆæ™ºèƒ½æŒ‡é’ˆç‰ˆæœ¬)
+    bool addItem(std::shared_ptr<Item> item);
+    //ç§»é™¤ç‰©å“
+    bool removeItem(const std::string& name, int quantity = 1);
 
-    virtual void use() = 0;
-    virtual void display() const {
-        std::cout << "ÎïÆ·: " << m_name 
-                  << " | ÊıÁ¿: " << m_quantity 
-                  << " | ÃèÊö: " << m_description << std::endl;
-    }
+    //ä½¿ç”¨ç‰©å“
+    bool useItem(const std::string& name, Player* player);
 
-protected:
-    std::string m_name;
-    ItemType m_type;
-    int m_quantity;
-    std::string m_description;
+    //æŸ¥æ‰¾ç‰©å“
+    Item* findItem(const std::string& name);
+
+    //æŒ‰ç±»å‹æŸ¥è¯¢
+    
+    //æŒ‰ç±»å‹è·å–æ‰€æœ‰ç‰©å“
+    std::vector<Item*> getItemsByType(Item::ItemType type) const;
+    std::vector<Weapon*> getWeapons() const;
+    std::vector<Armor*> getArmors() const;
+    std::vector<Material*> getMaterials() const;
+
+    //æ˜¾ç¤ºæ–¹æ³•
+    //æŒ‰ç±»å‹æ˜¾ç¤ºç‰©å“
+    void displayByType(Item::ItemType type) const;
+    //æ˜¾ç¤ºæ‰€æœ‰ç‰©å“,æŒ‰æ­¦å™¨â†’é˜²å…·â†’è¯å“â†’é£Ÿç‰©â†’ææ–™çš„é¡ºåºåˆ†ç±»æ˜¾ç¤º
+    void displayAll() const;
+    //ç»Ÿè®¡ä¿¡æ¯
+    //è·å–ç‰©å“æ€»æ•°é‡ï¼ˆæ‰€æœ‰ç‰©å“æ•°é‡ä¹‹å’Œï¼‰
+    int getTotalItems() const;
+    //è·å–æŒ‡å®šç±»å‹çš„ç‰©å“æ•°é‡
+    int getTypeCount(Item::ItemType type) const;
+    // è·å–ç‰©å“ç§ç±»æ•°ï¼ˆèƒŒåŒ…ä¸­æœ‰å¤šå°‘ç§ä¸åŒçš„ç‰©å“ï¼‰
+    int getItemCount() const;
+    //è·å–èƒŒåŒ…å®¹é‡ä¸Šé™
+    int getCapacity() const;
+    //ç®¡ç†æ“ä½œ
+    //æ¸…ç©ºèƒŒåŒ…
+    void clear();
+    //æŒ‰ç±»å‹æ’åº
+    void sortByType();
+    
+    //æŒ‰åç§°æ’åº
+    void sortByName();
 };
 
-// Ê³ÎïÀà
-class Food : public Item {
-public:
-    Food(const std::string& name, int quantity = 1, int healthRestore = 10)
-        : Item(name, FOOD, quantity), m_healthRestore(healthRestore), m_energyRestore(0) {}
-
-    Food(const std::string& name, int quantity, int healthRestore, int energyRestore)
-        : Item(name, FOOD, quantity), m_healthRestore(healthRestore), m_energyRestore(energyRestore) {}
-
-    void use() override {
-        if (m_quantity > 0) {
-            std::cout << "Ê³ÓÃ " << m_name 
-                      << ", »Ö¸´ÉúÃüÖµ: " << m_healthRestore 
-                      << ", »Ö¸´ÌåÁ¦: " << m_energyRestore << std::endl;
-            m_quantity--;
-        } else {
-            std::cout << m_name << " ÊıÁ¿²»×ã!" << std::endl;
-        }
-    }
-
-    void display() const override {
-        std::cout << "[Ê³Îï] " << m_name 
-                  << " | ÊıÁ¿: " << m_quantity 
-                  << " | ÉúÃü»Ö¸´: " << m_healthRestore 
-                  << " | ÌåÁ¦»Ö¸´: " << m_energyRestore 
-                  << " | " << m_description << std::endl;
-    }
-
-    int getHealthRestore() const { return m_healthRestore; }
-    int getEnergyRestore() const { return m_energyRestore; }
-
-private:
-    int m_healthRestore;
-    int m_energyRestore;
-};
-
-// ÎäÆ÷Àà
-class Weapon : public Item {
-public:
-    Weapon(const std::string& name, int quantity = 1, int damage = 5, int durability = 100)
-        : Item(name, WEAPON, quantity), m_damage(damage), m_durability(durability), 
-          m_maxDurability(durability), m_range(1.0f) {}
-
-    Weapon(const std::string& name, int quantity, int damage, int durability, float range)
-        : Item(name, WEAPON, quantity), m_damage(damage), m_durability(durability), 
-          m_maxDurability(durability), m_range(range) {}
-
-    void use() override {
-        if (m_quantity > 0 && m_durability > 0) {
-            std::cout << "Ê¹ÓÃ " << m_name << " ¹¥»÷! Ôì³ÉÉËº¦: " << m_damage 
-                      << " | ÄÍ¾Ã¶È: " << m_durability << "/" << m_maxDurability << std::endl;
-            m_durability--;
-            if (m_durability <= 0) {
-                std::cout << m_name << " Ëğ»µÁË!" << std::endl;
-                m_quantity--;
-                m_durability = m_maxDurability;
-            }
-        } else if (m_quantity <= 0) {
-            std::cout << m_name << " ÊıÁ¿²»×ã!" << std::endl;
-        } else {
-            std::cout << m_name << " ÒÑËğ»µ,ĞèÒªĞŞÀí!" << std::endl;
-        }
-    }
-
-    void display() const override {
-        std::cout << "[ÎäÆ÷] " << m_name 
-                  << " | ÊıÁ¿: " << m_quantity 
-                  << " | ÉËº¦: " << m_damage 
-                  << " | ÄÍ¾Ã: " << m_durability << "/" << m_maxDurability 
-                  << " | ·¶Î§: " << m_range 
-                  << " | " << m_description << std::endl;
-    }
-
-    void repair(int amount) {
-        m_durability = std::min(m_durability + amount, m_maxDurability);
-        std::cout << m_name << " ĞŞ¸´Íê³É, µ±Ç°ÄÍ¾Ã¶È: " << m_durability << std::endl;
-    }
-
-    int getDamage() const { return m_damage; }
-    int getDurability() const { return m_durability; }
-    int getMaxDurability() const { return m_maxDurability; }
-    float getRange() const { return m_range; }
-
-private:
-    int m_damage;
-    int m_durability;
-    int m_maxDurability;
-    float m_range;
-};
-
-// Ò©Æ·Àà
-class Medicine : public Item {
-public:
-    Medicine(const std::string& name, int quantity = 1, int healAmount = 20)
-        : Item(name, MEDICINE, quantity), m_healAmount(healAmount), m_cureStatus("") {}
-
-    Medicine(const std::string& name, int quantity, int healAmount, const std::string& cureStatus)
-        : Item(name, MEDICINE, quantity), m_healAmount(healAmount), m_cureStatus(cureStatus) {}
-
-    void use() override {
-        if (m_quantity > 0) {
-            std::cout << "Ê¹ÓÃ " << m_name 
-                      << ", »Ö¸´ÉúÃüÖµ: " << m_healAmount;
-            if (!m_cureStatus.empty()) {
-                std::cout << ", ÖÎÓú×´Ì¬: " << m_cureStatus;
-            }
-            std::cout << std::endl;
-            m_quantity--;
-        } else {
-            std::cout << m_name << " ÊıÁ¿²»×ã!" << std::endl;
-        }
-    }
-
-    void display() const override {
-        std::cout << "[Ò©Æ·] " << m_name 
-                  << " | ÊıÁ¿: " << m_quantity 
-                  << " | ÖÎÁÆÁ¿: " << m_healAmount;
-        if (!m_cureStatus.empty()) {
-            std::cout << " | ÌØÊâĞ§¹û: " << m_cureStatus;
-        }
-        std::cout << " | " << m_description << std::endl;
-    }
-
-    int getHealAmount() const { return m_healAmount; }
-    std::string getCureStatus() const { return m_cureStatus; }
-
-private:
-    int m_healAmount;
-    std::string m_cureStatus;
-};
-
-// ==================== ²ÄÁÏÀà£¨ĞÂÔö£© ====================
-class Material : public Item {
-public:
-    enum MaterialRarity {
-        COMMON,      // ÆÕÍ¨
-        UNCOMMON,    // Ï¡ÓĞ
-        RARE,        // º±¼û
-        EPIC,        // Ê·Ê«
-        LEGENDARY    // ´«Ëµ
-    };
-
-    Material(const std::string& name, int quantity = 1, 
-             MaterialRarity rarity = COMMON)
-        : Item(name, MATERIAL, quantity), m_rarity(rarity), m_craftValue(1) {}
-
-    Material(const std::string& name, int quantity, 
-             MaterialRarity rarity, int craftValue)
-        : Item(name, MATERIAL, quantity), m_rarity(rarity), m_craftValue(craftValue) {}
-
-    void use() override {
-        // ²ÄÁÏÍ¨³£²»ÄÜÖ±½ÓÊ¹ÓÃ£¬¶øÊÇÓÃÓÚºÏ³É
-        std::cout << m_name << " ÊÇ²ÄÁÏ,ÎŞ·¨Ö±½ÓÊ¹ÓÃ¡£" << std::endl;
-        std::cout << "Ï¡ÓĞ¶È: " << getRarityString() 
-                  << " | ºÏ³É¼ÛÖµ: " << m_craftValue << std::endl;
-    }
-
-    void display() const override {
-        std::cout << "[²ÄÁÏ] " << m_name 
-                  << " | ÊıÁ¿: " << m_quantity 
-                  << " | Ï¡ÓĞ¶È: " << getRarityString() 
-                  << " | ºÏ³É¼ÛÖµ: " << m_craftValue 
-                  << " | " << m_description << std::endl;
-    }
-
-    MaterialRarity getRarity() const { return m_rarity; }
-    int getCraftValue() const { return m_craftValue; }
-
-    std::string getRarityString() const {
-        switch(m_rarity) {
-            case COMMON:    return "ÆÕÍ¨";
-            case UNCOMMON:  return "Ï¡ÓĞ";
-            case RARE:      return "º±¼û";
-            case EPIC:      return "Ê·Ê«";
-            case LEGENDARY: return "´«Ëµ";
-            default:        return "Î´Öª";
-        }
-    }
-
-    // ²ÄÁÏÌØÓĞµÄºÏ³É¼ì²é
-    bool canCraftWith(const Material& other) const {
-        // ¼òµ¥Ê¾Àı£ºÏàÍ¬Ï¡ÓĞ¶ÈµÄ²ÄÁÏ¿ÉÒÔºÏ³É
-        return m_rarity == other.m_rarity;
-    }
-
-private:
-    MaterialRarity m_rarity;
-    int m_craftValue;  // ºÏ³É¼ÛÖµ
-};
-
-// ±³°üÀà
-class Bag {
-public:
-    Bag(const std::string& ownerName = "Player", int capacity = 20)
-        : m_ownerName(ownerName), m_capacity(capacity) {}
-
-    ~Bag() {
-        clear();
-    }
-
-    // Ìí¼ÓÎïÆ·
-    bool addItem(Item* item) {
-        if (item == nullptr) return false;
-        
-        if (getTotalItems() >= m_capacity) {
-            std::cout << "±³°üÒÑÂú,ÎŞ·¨Ìí¼Ó " << item->getName() << "!" << std::endl;
-            return false;
-        }
-
-        // ²éÕÒÊÇ·ñÒÑÓĞÍ¬ÃûÍ¬ÀàĞÍÎïÆ·
-        for (auto& existingItem : m_items) {
-            if (existingItem->getName() == item->getName() && 
-                existingItem->getType() == item->getType()) {
-                existingItem->addQuantity(item->getQuantity());
-                std::cout << "Ôö¼Ó " << item->getName() << " ÊıÁ¿: " 
-                          << item->getQuantity() << ", µ±Ç°×ÜÊı: " 
-                          << existingItem->getQuantity() << std::endl;
-                delete item;
-                return true;
-            }
-        }
-
-        m_items.push_back(item);
-        std::cout << "Ìí¼Ó " << item->getName() << " µ½±³°ü" << std::endl;
-        return true;
-    }
-
-    // ÒÆ³ıÎïÆ·
-    bool removeItem(const std::string& name, int quantity = 1) {
-        for (auto it = m_items.begin(); it != m_items.end(); ++it) {
-            if ((*it)->getName() == name) {
-                if ((*it)->getQuantity() > quantity) {
-                    (*it)->addQuantity(-quantity);
-                    std::cout << "ÒÆ³ı " << name << " x" << quantity 
-                              << ", Ê£Óà: " << (*it)->getQuantity() << std::endl;
-                } else {
-                    std::cout << "ÒÆ³ı " << name << std::endl;
-                    delete *it;
-                    m_items.erase(it);
-                }
-                return true;
-            }
-        }
-        std::cout << "Î´ÕÒµ½ÎïÆ·: " << name << std::endl;
-        return false;
-    }
-
-    // Ê¹ÓÃÎïÆ·
-    bool useItem(const std::string& name) {
-        for (auto& item : m_items) {
-            if (item->getName() == name) {
-                item->use();
-                if (item->getQuantity() <= 0) {
-                    removeItem(name, 0);
-                }
-                return true;
-            }
-        }
-        std::cout << "Î´ÕÒµ½ÎïÆ·: " << name << std::endl;
-        return false;
-    }
-
-    // ²éÕÒÎïÆ·
-    Item* findItem(const std::string& name) {
-        for (auto& item : m_items) {
-            if (item->getName() == name) {
-                return item;
-            }
-        }
-        return nullptr;
-    }
-
-    // °´ÀàĞÍÏÔÊ¾ÎïÆ·
-    void displayByType(Item::ItemType type) const {
-        std::string typeName;
-        switch(type) {
-            case Item::FOOD:     typeName = "Ê³Îï"; break;
-            case Item::WEAPON:   typeName = "ÎäÆ÷"; break;
-            case Item::MEDICINE: typeName = "Ò©Æ·"; break;
-            case Item::MATERIAL: typeName = "²ÄÁÏ"; break;  // ¡û ĞÂÔö
-            default:             typeName = "Î´Öª"; break;
-        }
-        
-        std::cout << "\n========== " << typeName << "ÁĞ±í ==========" << std::endl;
-        bool found = false;
-        for (const auto& item : m_items) {
-            if (item->getType() == type) {
-                item->display();
-                found = true;
-            }
-        }
-        if (!found) {
-            std::cout << "±³°üÖĞÃ»ÓĞ" << typeName << std::endl;
-        }
-    }
-
-    // ÏÔÊ¾ËùÓĞÎïÆ·
-    void displayAll() const {
-        std::cout << "\n========== " << m_ownerName << " µÄ±³°ü ("
-                  << getTotalItems() << "/" << m_capacity << ") ==========" << std::endl;
-        
-        if (m_items.empty()) {
-            std::cout << "±³°üÊÇ¿ÕµÄ" << std::endl;
-            return;
-        }
-
-        displayByType(Item::WEAPON);
-        displayByType(Item::MEDICINE);
-        displayByType(Item::FOOD);
-        displayByType(Item::MATERIAL);  // ¡û ĞÂÔö
-    }
-
-    // »ñÈ¡ÎïÆ·×ÜÊı
-    int getTotalItems() const {
-        int total = 0;
-        for (const auto& item : m_items) {
-            total += item->getQuantity();
-        }
-        return total;
-    }
-
-    // »ñÈ¡²»Í¬ÀàĞÍµÄÎïÆ·ÊıÁ¿
-    int getTypeCount(Item::ItemType type) const {
-        int count = 0;
-        for (const auto& item : m_items) {
-            if (item->getType() == type) {
-                count += item->getQuantity();
-            }
-        }
-        return count;
-    }
-
-    // ÇåÀí±³°ü
-    void clear() {
-        for (auto& item : m_items) {
-            delete item;
-        }
-        m_items.clear();
-    }
-
-    // ÅÅĞò±³°ü
-    void sortByType() {
-        std::sort(m_items.begin(), m_items.end(), 
-                  [](Item* a, Item* b) { return a->getType() < b->getType(); });
-    }
-
-    void sortByName() {
-        std::sort(m_items.begin(), m_items.end(), 
-                  [](Item* a, Item* b) { return a->getName() < b->getName(); });
-    }
-
-private:
-    std::string m_ownerName;
-    int m_capacity;
-    std::vector<Item*> m_items;
-};
+Item* cloneItem(const Item* item);
 
 #endif // BAG_H
