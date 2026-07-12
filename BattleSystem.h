@@ -1,111 +1,149 @@
-//战斗模块
-#ifndef BATTLESYSTEM_H
-#define BATTLESYSTEM_H
+#ifndef BATTLE_H
+#define BATTLE_H
 
-#include <memory>
-#include "character.h"
-#include "backpack.h"
-#include <iostream>
 #include <string>
+#include <vector>
+#include <memory>
+#include <random>
+#include <ctime>
 
-//**敌人基类
-class Enemy
+class Player;
+class Item;
+class Weapon;
+class Armor;
+class Material;
+
+enum class EnemyType 
 {
-    private:
-    std::string name;                       //名字
-    int level;                              //等级
-    int MaxHp;                              //最大血量
-    int Hp;                                 //当前血量
-    int attack;                             //攻击力
-    int Defence;                           //防御力
-    int speed;                              //速度
-    std::string status;                     //状态
-    public:
-//敌人基类构造
-    Enemy(std::string n,int l,int mh,int h,int ak,int df,int s,std::string st)
-    {
-        name=n;
-        level=l;
-        MaxHp=mh;
-        Hp=h;
-        attack=ak;
-        Defence=df;
-        speed=s;
-        status=st;
-    }
-//基类析构
-    virtual ~Enemy() {}
-//get函数
-    std::string GetName() const {return name;}
-    int Getlevel() const {return level;}
-    int GetMaxHp() const {return MaxHp;}
-    int GetHp() const {return Hp;}
-    int GetAttack() const {return attack;}
-    int GetDefence() const {return Defence;}
-    int GetSpeed() const {return speed;}
-    std::string GetStatus() const {return status;}
-
-    void SetHp(int hp) { Hp = hp; }
-    void SetStatus(const std::string& st) { status = st; }
-
-    virtual std::string GetType()const=0;                 //显示敌人类型
-    bool isAlive() const;                                 //判断敌人是否存活
-    virtual int Attack(Character& target)=0;              //攻击人物
-    void takeDamage(int damage);                          //收到伤害
-    void display() const;                                 //显示敌人信息
+    SLIME,      // 史莱姆 - 最基础，容易击败
+    WILD_CAT,   // 野猫 - 速度型，攻击高但血少
+    GIANT_FISH, // 变异鱼 - 水中怪物，血量中等
+    ANGRY_GOOSE,// 大白鹅 - 攻击高，血量较高
+    SHADOW_BOSS // 暗影校长 - Boss级敌人
 };
-//三种敌人
-//普通
-class Normal:public Enemy
+
+enum class EnemyState 
 {
-    Normal(int playerLevel);
-    std::string GetType() const override;
-    int Attack(Character& target) override;
+    ALIVE,      // 存活
+    DEAD,       // 死亡
+    FLEEING     // 逃跑（暂未使用）
 };
-//精英
-class Elite : public Enemy
+
+class Enemy 
 {
 public:
-    Elite(int playerLevel);
-    std::string GetType() const override;
-    int Attack(Character& target) override;
+    static std::mt19937 s_rng;
+
+    Enemy(const std::string& name, EnemyType type, int hp, int attack, int defense, int speed,int expReward, int goldReward);
+    virtual ~Enemy() = default;
+    //Getter 方法
+    std::string getName() const;
+    EnemyType getType() const;
+    int getHP() const;
+    int getMaxHP() const;
+    int getAttack() const;
+    int getDefense() const;
+    int getSpeed() const;
+    int getExpReward() const;
+    int getGoldReward() const;
+    EnemyState getState() const;
+    bool isAlive() const;
+
+    //Setter 方法 
+    void setHP(int hp);
+    void setState(EnemyState state);
+    void setExpReward(int exp);
+    void setGoldReward(int gold);
+    //核心战斗方法
+    //伤害
+    virtual int attack(Player* player);
+    //受到伤害
+    int takeDamage(int damage);
+    //显示敌人信息
+    virtual void display() const;
+    protected:
+    std::string m_name;        // 敌人名称
+    EnemyType m_type;          // 敌人类型
+    int m_hp;                  // 当前生命值
+    int m_maxHP;               // 最大生命值
+    int m_attack;              // 攻击力
+    int m_defense;             // 防御力
+    int m_speed;               // 速度属性，影响战斗顺序
+    int m_expReward;           // 经验奖励
+    int m_goldReward;          // 金币奖励
+    EnemyState m_state;        // 当前状态
 };
-//BOSS
-class Boss : public Enemy
+
+//史莱姆类
+class Slime : public Enemy 
+{
+    public:
+    Slime();
+    void display() const override;
+};
+
+//野猫类
+class WildCat : public Enemy 
 {
 public:
-    Boss(int playerLevel);
-    std::string GetType() const override;
-    int Attack(Character& target) override;
-    int SpecialAttack(Character& target);                  // Boss专属技能
+    WildCat();
+    void display() const override;
 };
-//**战斗系统
-class BattleSystem
+
+//变异鱼类
+class GiantFish : public Enemy 
 {
-    private:
-    Character* player;
-    Enemy* currentEnemy;
-    bool isbattleActive;
-
-    // 私有辅助函数
-    void startBattle(Enemy* enemy);   // 核心战斗逻辑（三个公开函数共用）
-    void playerTurn();                // 玩家回合
-    void enemyTurn();                 // 敌人回合
-    void processReward();             // 结算奖励
-    void displayStatus() const;       // 显示战斗状态
-
-    public:
-    // 构造函数 & 析构函数
-    BattleSystem(Character* p);
-    ~BattleSystem();
-
-    // 三个公开接口
-    void startNormalBattle();
-    void startEliteBattle();
-    void startBossBattle();
-
-    // 辅助,判断战斗是否在进行
-    bool isBattleActive() const { return isbattleActive; }
+public:
+    GiantFish();
+    void display() const override;
 };
 
-#endif
+//大白鹅类
+class AngryGoose : public Enemy 
+{
+public:
+    AngryGoose();
+    // 重写攻击方法：大白鹅攻击力更高，可能造成暴击
+    int attack(Player* player) override;
+    void display() const override;
+};
+
+//暗影校长类
+class ShadowBoss : public Enemy 
+{
+public:
+    ShadowBoss();
+    // 重写攻击方法：Boss特殊攻击，伤害更高
+    int attack(Player* player) override;
+    void display() const override;
+};
+
+// 战斗系统类 BattleSystem
+class BattleSystem 
+{
+public:
+    //构造函数
+    BattleSystem(Player* player);
+    ~BattleSystem() = default;
+    //主菜单
+    void showMenu();
+    //战斗流程
+    void startBattle(int enemyTypeIndex);     // 开始战斗
+    void playerTurn(Enemy* enemy);            // 玩家回合
+    void enemyTurn(Enemy* enemy);             // 敌人回合
+    //敌人管理
+    void showEnemyList() const;               // 显示敌人列表
+    std::shared_ptr<Enemy> createEnemy(EnemyType type);  // 创建敌人
+    //奖励发放
+    void grantRewards(Enemy* enemy);          // 发放经验、金币、物品
+    private:
+    Player* m_player;                         // 玩家指针
+    std::vector<std::shared_ptr<Enemy>> m_enemyPool;  // 敌人池
+    bool m_battleActive;                      // 战斗是否进行中
+    //私有方法
+    void initEnemyPool();                     // 初始化敌人池
+    void displayBattleStatus(Enemy* enemy);   // 显示战斗状态
+    void dropItems(Enemy* enemy);             // 掉落物品
+};
+
+#endif // BATTLE_H
