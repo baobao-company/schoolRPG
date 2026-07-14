@@ -1,12 +1,12 @@
 #ifndef ITEM_H
 #define ITEM_H
 
-#include "Player.h"
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>             //算法头文件
 
+class Player;
 // 第一部分：物品基类 Item
 class Item 
 {
@@ -75,15 +75,16 @@ class Weapon : public Item
 {
     public:
     //构造函数
-    // 两个重载：一个不带攻击范围（默认1.0），一个带攻击范围
     Weapon(const std::string& name, int quantity=1, int damage=5);
     //重写虚函数
     void display() const override;                              // 显示武器特有信息
     bool isEnhanceable() const override { return true; }        // 武器可强化
     //Getter
+    int getBaseDamage() const { return m_baseDamage; }
     int getDamage() const;                                      // 获取当前攻击力（基础 + 强化加成）
     //强化相关 
     int getEnhanceDamage() const;                               // 计算强化带来的攻击加成
+    void Weapon::use(Player* player);
 private:
     int m_baseDamage;                                           // 基础攻击力
 };
@@ -96,10 +97,11 @@ class Armor : public Item
     void display() const override;                                  // 显示防具特有信息
     bool isEnhanceable() const override { return true; }            // 防具可强化
     //Getter
+    int getBaseDefense() const { return m_baseDefense; }
     int getDefense() const;                                         // 获取当前防御力（基础 + 强化加成）
     //强化相关
     int getEnhanceDefense() const;                                  // 计算强化带来的防御加成
-
+    void Armor::use(Player* player);
     private:
     int m_baseDefense;       // 基础防御力
 };
