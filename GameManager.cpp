@@ -396,29 +396,19 @@ bool GameManager::loadFromFile(const std::string& filename)
     std::ifstream file(filename);
     if (!file.is_open()) 
     {
+        std::cout << " 存档文件不存在" << std::endl;
         return false;
     }
-    try 
-    {
-        std::string line;
-        
-        // 1. 读取版本号
-        std::getline(file, line);
-        if (line.empty()) 
-        {
-            file.close();
-            return false;
-        }
 
-        // 2. 读取玩家数据
+    try {
+        std::string line;      
+        // 1. 版本号
         std::getline(file, line);
-        if (line.empty()) 
-        {
-            file.close();
-            return false;
-        }
 
-        // 如果没有玩家对象，创建
+        // 2. 玩家数据
+        std::getline(file, line);
+        if (line.empty()) { file.close(); return false; }
+
         if (!m_player) 
         {
             std::stringstream ss(line);
@@ -427,22 +417,35 @@ bool GameManager::loadFromFile(const std::string& filename)
             m_player = new Player(name);
         }
 
-        // 恢复玩家数据
         if (!m_player->deserialize(line)) 
         {
             file.close();
             return false;
         }
 
-        // 3. 读取背包数据 
+        // 3. 背包数据 - 读取完整背包块
         std::getline(file, line);
-        Bag* bag = m_player->getBag();
-        if (bag && !line.empty() && line != "0") 
+        int itemCount = std::stoi(line);
+
+        std::string bagData = line + "\n";  // 数量行
+        for (int i = 0; i < itemCount; ++i) 
         {
-            bag->deserialize(line);
+            std::getline(file, line);
+            bagData += line + "\n";
         }
 
-        // 4. 读取任务进度 
+        Bag* bag = m_player->getBag();
+        if (bag && itemCount > 0) 
+        {
+            if (!bag->deserialize(bagData)) 
+            {
+                std::cout << " 背包数据反序列化失败！" << std::endl;
+                file.close();
+                return false;
+            }
+        }
+
+        // 4. 任务进度
         std::getline(file, line);
         TaskManager* taskMgr = m_player->getTaskManager();
         if (taskMgr && !line.empty()) 
@@ -450,7 +453,7 @@ bool GameManager::loadFromFile(const std::string& filename)
             taskMgr->deserializeProgress(line);
         }
 
-        // 5. 读取商店数据
+        // 5. 商店数据
         std::getline(file, line);
         Shop* shop = m_player->getShop();
         if (shop && !line.empty() && line != "0") 
@@ -460,10 +463,11 @@ bool GameManager::loadFromFile(const std::string& filename)
 
         file.close();
         return true;
+        
     } 
     catch (const std::exception& e) 
     {
-        std::cout << " 读取存档时发生错误：" << e.what() << "\n";
+        std::cout << " 读档异常: " << e.what() << std::endl;
         file.close();
         return false;
     }
