@@ -84,7 +84,7 @@ class Weapon : public Item
     int getDamage() const;                                      // 获取当前攻击力（基础 + 强化加成）
     //强化相关 
     int getEnhanceDamage() const;                               // 计算强化带来的攻击加成
-    void Weapon::use(Player* player);
+    void use(Player* player);
 private:
     int m_baseDamage;                                           // 基础攻击力
 };
@@ -101,7 +101,7 @@ class Armor : public Item
     int getDefense() const;                                         // 获取当前防御力（基础 + 强化加成）
     //强化相关
     int getEnhanceDefense() const;                                  // 计算强化带来的防御加成
-    void Armor::use(Player* player);
+    void use(Player* player);
     private:
     int m_baseDefense;       // 基础防御力
 };
