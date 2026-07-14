@@ -438,7 +438,7 @@ bool Player::deserialize(const std::string& data)
         parts.push_back(token);
     }
     // 检查字段数量
-    if (parts.size() < 6) 
+    if (parts.size() < 9) 
     {
         std::cout << " 玩家数据格式错误！" << std::endl;
         return false;
@@ -458,6 +458,9 @@ bool Player::deserialize(const std::string& data)
         if (m_hp > m_maxHP) m_hp = m_maxHP;
         if (m_exp < 0) m_exp = 0;
         if (m_gold < 0) m_gold = 0;
+        if (m_baseAttack < 0) m_baseAttack = 0;
+        if (m_baseDefense < 0) m_baseDefense = 0;
+        if (m_speed < 0) m_speed = 0;
         
         return true;
     } 
