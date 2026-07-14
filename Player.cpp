@@ -295,6 +295,10 @@ bool Player::addGold(int amount)
         {
             std::cout << " 获得 " << amount << " 金币！" << std::endl;
         }
+         if (m_taskManager) 
+        {
+            m_taskManager->onEvent(ConditionType::HaveGold, m_gold, 1);
+        }
         return true;
     } 
     else 
@@ -308,6 +312,10 @@ bool Player::addGold(int amount)
         }
         m_gold -= need;
         std::cout << " 消耗 " << need << " 金币" << std::endl;
+        if (m_taskManager) 
+        {
+            m_taskManager->onEvent(ConditionType::HaveGold, m_gold, 1);
+        }
         return true;
     }
 }
