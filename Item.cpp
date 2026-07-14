@@ -1,4 +1,5 @@
 #include "Item.h"
+#include "Player.h"
 #include <iostream>
 #include <algorithm>
 
@@ -72,6 +73,11 @@ void Item::addEnhanceLevel(int delta)
 bool Item::isEnhanceable() const 
 {
     return (m_type==WEAPON||m_type==ARMOR);
+}
+
+void Item::use(Player* player) 
+{
+    std::cout << "不能直接使用该物品！" << std::endl;
 }
 
 //显示物品信息
@@ -156,6 +162,13 @@ int Weapon::getEnhanceDamage() const
     return 25 + (m_enhanceLevel - 8) * 5;
 }
 
+void Weapon::use(Player* player) 
+{
+    if (!player) return;
+    // 直接装备武器
+    player->equipWeapon(this);
+}
+
 //Armor 防具类实现
 Armor::Armor(const std::string& name, int quantity, int defense)
     : Item(name, ARMOR, quantity), m_baseDefense(defense){}
@@ -181,6 +194,13 @@ int Armor::getDefense() const
 int Armor::getEnhanceDefense() const 
 {
     return m_enhanceLevel * 2;
+}
+
+void Armor::use(Player* player) 
+{
+    if (!player) return;
+    // 直接装备防具
+    player->equipArmor(this);
 }
 
 //Medicine 药品类实现
