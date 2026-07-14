@@ -489,8 +489,14 @@ void TaskManager::resetAllTasks()
 std::string TaskManager::serializeProgress() const 
 {
     std::ostringstream oss;
+    bool first = true;
     for (const auto& taskPtr : m_allTasks) 
     {
+         if (!first) 
+        {
+            oss << "|";
+        }
+        first=false;
         oss << taskPtr->getId() << ","
             << static_cast<int>(taskPtr->getStatus()) << ",";
         for (const auto& cond : taskPtr->getConditions()) 
