@@ -1,508 +1,206 @@
 #include "GameManager.h"
 #include "Player.h"
 #include "Bag.h"
-#include "Task.h"
-#include "Shop.h"
 #include "BattleSystem.h"
 #include "ForgeManager.h"
+#include "Shop.h"
+#include "Task.h"
 #include "Item.h"
-#include <iostream>
+#include "../ui/MainMenuUI.h"
+#include "../ui/BagUI.h"
+#include "../ui/ForgeUI.h"
+#include "../ui/ShopUI.h"
+#include "../ui/TaskUI.h"
+#include "../ui/BattleUI.h"
+#include "../ui/PlayerInfoUI.h"
 #include <fstream>
 #include <sstream>
-#include <iomanip>
-#include <ctime>
-#include <limits>
-
-GameManager::GameManager() : m_player(nullptr), m_state(GameState::MAIN_MENU), m_isRunning(true) 
+GameManager::GameManager() : m_player(nullptr), m_state(GameState::MAIN_MENU), m_runFlag(true)
 {
-    std::cout << "              校园RPG冒险游戏                     \n";
-    // 尝试加载存档
-    if (loadFromFile(getSaveFilePath())) 
-    {
-        std::cout << " 读取存档成功！欢迎回来，" << m_player->getName() << "！\n";
-    } 
-    else 
-    {
-        // 没有存档，创建新游戏
-        std::cout << "没有找到存档，创建新游戏...\n";
-        initGame();
-    }
+    uiMain = std::make_unique<MainMenuUI>();
+    uiPlayer = std::make_unique<PlayerInfoUI>();
+    uiBag = std::make_unique<BagUI>();
+    uiForge = std::make_unique<ForgeUI>();
+    uiShop = std::make_unique<ShopUI>();
+    uiTask = std::make_unique<TaskUI>();
+    // 旧代码：uiBattle.reset(new BattleUI(m_player));
+    // 替换为无参构造
+    uiBattle.reset(new BattleUI());
+    if (!loadFromFile("savegame.dat"))
+        initGameNew();
 }
-
-GameManager::~GameManager() 
+GameManager::~GameManager()
 {
-    // 自动保存
-    if (m_player) 
+    if (m_player != nullptr)
     {
-        saveToFile(getSaveFilePath());
-        std::cout << " 游戏已自动保存\n";
+        try
+        {
+            saveToFile("savegame.dat");
+        }
+        catch (...) {}
     }
     delete m_player;
     m_player = nullptr;
 }
-
-// 游戏初始化
-void GameManager::initGame() 
+void GameManager::initGameNew()
 {
-    // 创建玩家
-    std::string name;
-    std::cout << "\n请输入你的角色名称：";
-    std::cin >> name;                                                   ////////////////////////////
+    std::wstring name = L"玩家";
     m_player = new Player(name);
-    // 给玩家一些初始物品
-    Bag* bag = m_player->getBag();
-    if (bag) 
-    {
-        bag->addItem(new Food("面包", 3, 10, 0, 0));      // HP+10
-        bag->addItem(new Food("能量饼干", 2, 15, 0, 0)); // HP+15
-        bag->addItem(new Medicine("回复药水", 3, 30));    // 恢复30HP
-        bag->addItem(new Material("普通材料", 5, Material::COMMON));
-    }
-    std::cout << "\n 游戏初始化完成！\n";
-    waitForEnter();
+    Bag* b = m_player->getBag();
+    b->addItem(new Food(L"面包",3,10,0,0));
+    b->addItem(new Food(L"能量饼干",2,15,0,0));
+    b->addItem(new Medicine(L"回复药水",3,30));
+    b->addItem(new Material(L"普通材料",5,Material::COMMON));
 }
-
-// 游戏主循环
-void GameManager::run() 
+void GameManager::exitGameLogic()
 {
-    m_state = GameState::RUNNING;
-    m_isRunning = true;
-    while (m_isRunning) 
-    {
-        showMainMenu();
-
-    }
-    std::cout << "\n 感谢游玩！再见！\n";
+    m_runFlag = false;
 }
-
-// 主菜单显示
-void GameManager::showMainMenu() 
+void GameManager::setState(GameState s) { m_state = s; }
+GameState GameManager::getState() const { return m_state; }
+Player* GameManager::getPlayer() const { return m_player; }
+void GameManager::handleSFEvent(sf::Event& ev, sf::RenderWindow& win)
 {
-
-    
-    std::cout << "\n";
-    std::cout << "╔═══════════════════════════════════════════════════════╗\n";
-    std::cout << "║                     主菜单                         ║\n";
-    std::cout << "╚═══════════════════════════════════════════════════════╝\n";
-
-    // 显示玩家状态
-    if (m_player) 
+    switch(m_state)
     {
-        std::cout << "   " << m_player->getName() 
-                  << "  | Lv." << m_player->getLevel()
-                  << "  |  " << m_player->getHP() << "/" << m_player->getMaxHP()
-                  << "  |  " << m_player->getGold() << "金\n";
-    }
-
-    std::cout << "\n─────────────────────────────────────────────────────────\n";
-    std::cout << "  1.  角色信息\n";
-    std::cout << "  2.  背包\n";
-    std::cout << "  3.  锻造工坊\n";
-    std::cout << "  4.  商店\n";
-    std::cout << "  5.  任务\n";
-    std::cout << "  6.  战斗\n";
-    std::cout << "  7.  存档\n";
-    std::cout << "  8.  读档\n";
-    std::cout << "  9.  退出游戏\n";
-    std::cout << "─────────────────────────────────────────────────────────\n";
-    std::cout << "请选择（输入数字）：";
-
-    int choice;
-    std::cin >> choice;                     ////////////////////////////////////////////////////
-
-    // 处理输入错误
-    if (std::cin.fail()) 
-    {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << " 请输入有效数字！\n";
-        waitForEnter();
-        return;
-    }
-
-    // 处理选择
-    switch (choice) 
-    {
-        case 1:
-            viewPlayerInfo();
-            break;
-        case 2:
-            viewBag();
-            break;
-        case 3:
-            enterForge();
-            break;
-        case 4:
-            enterShop();
-            break;
-        case 5:
-            enterTask();
-            break;
-        case 6:
-            enterBattle();
-            break;
-        case 7:
-            saveGame();
-            break;
-        case 8:
-            loadGame();
-            break;
-        case 9:
-            exitGame();
-            break;
-        default:
-            std::cout << " 无效选择，请重新输入！\n";
-            waitForEnter();
-            break;
+        case GameState::MAIN_MENU:
+            uiMain->handleEvent(ev, win, this); break;
+        case GameState::VIEW_PLAYER:
+            uiPlayer->handleEvent(ev, win, this); break;
+        case GameState::VIEWING_BAG:
+            uiBag->handleEvent(ev, win, this); break;
+        case GameState::IN_FORGE:
+            uiForge->handleEvent(ev, win, this); break;
+        case GameState::IN_SHOP:
+            uiShop->handleEvent(ev, win, this); break;
+        case GameState::IN_TASK:
+            uiTask->handleEvent(ev, win, this); break;
+        case GameState::IN_BATTLE:
+            uiBattle->handleEvent(ev, win, this); break;
+        default: break;
     }
 }
-
-// 各功能入口实现
-//查看角色信息
-void GameManager::viewPlayerInfo() 
+void GameManager::renderAll(sf::RenderWindow& win, sf::Font& font)
 {
-    if (m_player) 
+    switch(m_state)
     {
-        m_player->displayInfo();
+        case GameState::MAIN_MENU:
+            uiMain->render(win, font, m_player); break;
+        case GameState::VIEW_PLAYER:
+            uiPlayer->render(win, font, m_player); break;
+        case GameState::VIEWING_BAG:
+            uiBag->render(win, font, m_player); break;
+        case GameState::IN_FORGE:
+            uiForge->render(win, font, m_player); break;
+        case GameState::IN_SHOP:
+            uiShop->render(win, font, m_player); break;
+        case GameState::IN_TASK:
+            uiTask->render(win, font, m_player); break;
+        case GameState::IN_BATTLE:
+            uiBattle->render(win, font, m_player); break;
+        default: break;
     }
-    waitForEnter();
-}
-//查看背包
-void GameManager::viewBag() 
-{
-    if (!m_player) return;
-    Bag* bag = m_player->getBag();
-    if (!bag) return;
-    bag->displayAll();
-    // 提供使用物品的快捷功能
-    if (bag->getItemCount() > 0) 
+    // ==================== 新增：战斗外自动回血 ====================
+    if(m_player == nullptr) return;
+    // 计时冷却到达
+    if(m_healTimer.getElapsedTime().asSeconds() >= HEAL_CD)
     {
-        std::cout << "\n─────────────────────────────────────────────────────────\n";
-        std::cout << "是否要使用物品？(y/n)：";
-        char choice;
-        std::cin >> choice;                             /////////////////////////////////////////////
-        if (choice == 'y' || choice == 'Y') 
+        // 当前不在战斗界面才回血
+        if(m_state != GameState::IN_BATTLE)
         {
-            std::cout << "请输入要使用的物品名称：";
-            std::string itemName;
-            std::cin >> itemName;
-            bag->useItem(itemName, m_player); 
-            std::cout << "\n更新后的背包：\n";
-            bag->displayAll();
-        }
-    }
-    waitForEnter();
-}
-//进入锻造工坊
-void GameManager::enterForge() 
-{
-    if (!m_player) return;
-    ForgeManager* forge = m_player->getForgeManager();
-    if (forge) 
-    {
-        forge->showMenu();
-    }
-}
-//进入商店
-void GameManager::enterShop() 
-{
-    if (!m_player) return;
-    Shop* shop = m_player->getShop();
-    if (shop) 
-    {
-        shop->showMenu();
-    }
-}
-//进入任务面板
-void GameManager::enterTask() 
-{
-    if (!m_player) return;
-    TaskManager* taskMgr = m_player->getTaskManager();
-    if (!taskMgr) 
-    {
-        std::cout << "任务系统未初始化！\n";
-        waitForEnter();
-        return;
-    }
-    taskMgr->showTaskList();
-    std::cout << "\n─────────────────────────────────────────────────────────\n";
-    std::cout << "请选择操作：\n";
-    std::cout << "  1. 查看任务详情\n";
-    std::cout << "  2. 接取任务\n";
-    std::cout << "  3. 领取奖励\n";
-    std::cout << "  0. 返回\n";
-    std::cout << "请选择：";
-
-    int choice;
-    std::cin >> choice;                                 //////////////////////////////////
-    switch (choice) 
-    {
-        case 1: 
-        {
-            std::cout << "请输入任务ID：";
-            int taskId;
-            std::cin >> taskId;                     //////////////////////////
-            taskMgr->showTaskDetail(taskId);
-            break;
-        }
-        case 2: 
-        {
-            std::cout << "请输入任务ID：";
-            int taskId;
-            std::cin >> taskId;                 ///////////////////////////
-            taskMgr->acceptTask(taskId);
-            break;
-        }
-        case 3:     
-        {
-            std::cout << "请输入任务ID：";
-            int taskId;
-            std::cin >> taskId;             /////////////////////
-            taskMgr->claimReward(taskId);
-            break;
-        }
-        case 0:
-        default:
-            break;
-    }
-    waitForEnter();
-}
-//进入战斗系统
-void GameManager::enterBattle() 
-{
-    if (!m_player) return;
-    // 检查玩家是否存活
-    if (m_player->getHP() <= 0) 
-    {
-        std::cout << " 你的生命值为0！\n";
-        std::cout << "   请使用药品恢复，或重新读档。\n";
-        waitForEnter();
-        return;
-    }
-    BattleSystem* battle = new BattleSystem(m_player);
-    battle->showMenu();
-    delete battle;
-}
-// 存档/读档
-//保存游戏
-void GameManager::saveGame() 
-{
-
-    if (!m_player) 
-    {
-        std::cout << " 没有玩家数据可保存！\n";
-        waitForEnter();
-        return;
-    }
-    std::cout << "\n 正在保存游戏...\n";
-    if (saveToFile(getSaveFilePath())) 
-    {
-        std::cout << " 游戏保存成功！\n";
-        std::cout << "   存档位置: " << getSaveFilePath() << "\n";
-    } 
-    else 
-    {
-        std::cout << " 游戏保存失败！\n";
-    }
-    waitForEnter();
-}
-//读取存档
-void GameManager::loadGame() 
-{
-    std::cout << "\n 正在读取存档...\n";
-    if (loadFromFile(getSaveFilePath())) 
-    {
-        std::cout << " 读取存档成功！\n";
-        m_state = GameState::RUNNING;
-    } 
-    else
-    {
-        std::cout << " 读取存档失败！\n";
-    }
-    waitForEnter();
-}
-
-//退出游戏
-void GameManager::exitGame() 
-{
-    if (confirmAction("确定要退出游戏吗？")) 
-    {
-        m_isRunning = false;
-        std::cout << " 再见！\n";
-    }
-}
-// 文件操作
-//获取存档文件路径
-std::string GameManager::getSaveFilePath() const 
-{
-    return "savegame.dat";
-}
-//保存游戏到文件
-bool GameManager::saveToFile(const std::string& filename) 
-{
-    if (!m_player) return false;
-    std::ofstream file(filename, std::ios::out | std::ios::trunc);
-    if (!file.is_open()) 
-    {
-        std::cout << " 无法打开文件 " << filename << " 进行写入！\n";
-        return false;
-    }
-    try {
-
-        // 1. 版本号
-        file << "1.0\n";
-        // 2. 玩家数据
-        file << m_player->serialize() << "\n";
-        // 3. 背包数据
-        Bag* bag = m_player->getBag();
-        if (bag) 
-        {
-            file << bag->serialize() << "\n";
-        }
-
-        // 4. 任务进度
-        TaskManager* taskMgr = m_player->getTaskManager();
-        if (taskMgr) 
-        {
-            file << taskMgr->serializeProgress() << "\n";
-        }
-        else 
-        {
-            file << "\n";
-        }
-        // 5. 商店数据
-        Shop* shop = m_player->getShop();
-        if (shop) 
-        {
-            file << shop->serialize() << "\n";
-        } 
-        else 
-        {
-            file << "0\n";
-        }   
-        file.close();
-        return true;
-    } 
-    catch (const std::exception& e) 
-    {
-        std::cout << " 保存时发生错误：" << e.what() << "\n";
-        file.close();
-        return false;
-    }
-}
-//从文件读取存档
-bool GameManager::loadFromFile(const std::string& filename) 
-{
-    std::ifstream file(filename);
-    if (!file.is_open()) 
-    {
-        std::cout << " 存档文件不存在" << std::endl;
-        return false;
-    }
-
-    try {
-        std::string line;      
-        // 1. 版本号
-        std::getline(file, line);
-
-        // 2. 玩家数据
-        std::getline(file, line);
-        if (line.empty()) { file.close(); return false; }
-
-        if (!m_player) 
-        {
-            std::stringstream ss(line);
-            std::string name;
-            std::getline(ss, name, ',');
-            m_player = new Player(name);
-        }
-
-        if (!m_player->deserialize(line)) 
-        {
-            file.close();
-            return false;
-        }
-
-        // 3. 背包数据 - 读取完整背包块
-        std::getline(file, line);
-        int itemCount = std::stoi(line);
-
-        std::string bagData = line + "\n";  // 数量行
-        for (int i = 0; i < itemCount; ++i) 
-        {
-            std::getline(file, line);
-            bagData += line + "\n";
-        }
-
-        Bag* bag = m_player->getBag();
-        if (bag && itemCount > 0) 
-        {
-            if (!bag->deserialize(bagData)) 
+            int nowHp = m_player->getHP();
+            int maxHp = m_player->getMaxHP();
+            if(nowHp < maxHp)
             {
-                std::cout << " 背包数据反序列化失败！" << std::endl;
-                file.close();
-                return false;
+                m_player->healHP(HEAL_NUM);
             }
         }
-
-        // 4. 任务进度
-        std::getline(file, line);
-        TaskManager* taskMgr = m_player->getTaskManager();
-        if (taskMgr && !line.empty()) 
-        {
-            taskMgr->deserializeProgress(line);
-        }
-
-        // 5. 商店数据
-        std::getline(file, line);
-        Shop* shop = m_player->getShop();
-        if (shop && !line.empty() && line != "0") 
-        {
-            shop->deserialize(line);
-        }
-
-        file.close();
-        return true;
-        
-    } 
-    catch (const std::exception& e) 
+        m_healTimer.restart();
+    }
+    // ==============================================================
+}
+void GameManager::openPlayerInfo() { setState(GameState::VIEW_PLAYER); }
+void GameManager::openBag() { setState(GameState::VIEWING_BAG); }
+void GameManager::openForge() { setState(GameState::IN_FORGE); }
+void GameManager::openShop() { setState(GameState::IN_SHOP); }
+void GameManager::openTask() { setState(GameState::IN_TASK); }
+void GameManager::openBattle() { setState(GameState::IN_BATTLE); }
+void GameManager::doSave()
+{
+    saveToFile("savegame.dat");
+}
+void GameManager::doLoad()
+{
+    loadFromFile("savegame.dat");
+}
+bool GameManager::saveToFile(const std::string& path)
+{
+    try
     {
-        std::cout << " 读档异常: " << e.what() << std::endl;
-        file.close();
+        if (m_player == nullptr)
+            return false;
+
+        std::ofstream f(path, std::ios::trunc);
+        if (!f.is_open())
+            return false;
+
+        // 固定5行完整存档，一行不能少
+        f << "1.0\n";
+        f << m_player->serialize() << "\n";
+        f << m_player->getBag()->serialize() << "\n";
+        f << m_player->getTaskManager()->serialize() << "\n";
+        f << m_player->getShop()->serialize() << "\n";
+
+        f.flush();
+        f.close();
+        return true;
+    }
+    catch (...)
+    {
         return false;
     }
 }
-
-// 辅助方法
-//等待用户按回车
-void GameManager::waitForEnter() const 
+bool GameManager::loadFromFile(const std::string& path)
 {
-    std::cout << "\n按回车键继续...";
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    std::cin.get();
-}
+    try
+    {
+        std::ifstream f(path);
+        if (!f.is_open())
+            return false;
 
-//确认操作
-bool GameManager::confirmAction(const std::string& message) const 
-{
-    std::cout << message << " (y/n)：";
-    char choice;
-    std::cin >> choice;
-    return (choice == 'y' || choice == 'Y');
-}
+        // 旧玩家彻底释放，杜绝内存泄漏
+        if (m_player != nullptr)
+        {
+            delete m_player;
+            m_player = nullptr;
+        }
+        m_player = new Player(L"玩家");
 
-// Getter / Setter
-GameState GameManager::getState() const 
-{
-    return m_state;
-}
+        std::string line;
+        // 版本号
+        if (!std::getline(f, line)) throw 1;
+        // 玩家数据
+        if (!std::getline(f, line) || !m_player->deserialize(line)) throw 2;
+        // 背包
+        if (!std::getline(f, line) || !m_player->getBag()->deserialize(line)) throw 3;
+        // 任务
+        if (!std::getline(f, line)) throw 4;
+        m_player->getTaskManager()->deserialize(line);
+        // 商店
+        if (!std::getline(f, line)) throw 5;
+        m_player->getShop()->deserialize(line);
 
-void GameManager::setState(GameState state) 
-{
-    m_state = state;
-}
-
-Player* GameManager::getPlayer() const 
-{
-    return m_player;
+        f.close();
+        return true;
+    }
+    catch (...)
+    {
+        // 读取损坏，清空半成品玩家
+        if (m_player != nullptr)
+        {
+            delete m_player;
+            m_player = nullptr;
+        }
+        return false;
+    }
 }
