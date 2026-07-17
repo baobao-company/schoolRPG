@@ -1,9 +1,10 @@
 #ifndef GAME_MANAGER_H
 #define GAME_MANAGER_H
-
 #include <string>
 #include <memory>
 #include <vector>
+#include <SFML/Graphics.hpp>
+
 
 class Player;
 class Bag;
@@ -11,63 +12,67 @@ class TaskManager;
 class Shop;
 class BattleSystem;
 class ForgeManager;
+class MainMenuUI;
+class PlayerInfoUI;
+class BagUI;
+class ForgeUI;
+class ShopUI;
+class TaskUI;
+class BattleUI;
 
-// 游戏状态枚举
-enum class GameState 
+enum class GameState
 {
-    MAIN_MENU,      // 主菜单
-    RUNNING,        // 游戏中
-    IN_BATTLE,      // 战斗中
-    IN_SHOP,        // 在商店
-    IN_FORGE,       // 在锻造工坊
-    IN_TASK,        // 在任务面板
-    VIEWING_BAG,    // 查看背包
-    VIEWING_PLAYER, // 查看角色
-    SAVING,         // 存档中
-    LOADING,        // 读档中
-    EXITING         // 退出
+    MAIN_MENU, RUNNING, IN_BATTLE, IN_SHOP, IN_FORGE,
+    IN_TASK, VIEWING_BAG, VIEW_PLAYER, SAVING, LOADING, EXITING
 };
 
-// 游戏管理器类 GameManager
 class GameManager
 {
-    private:
-    Player* m_player;                // 玩家对象
-    GameState m_state;               // 当前游戏状态
-    bool m_isRunning;                // 游戏是否运行中
-    //私有方法
-    void initGame();                 // 初始化游戏
-    void exitGame();                 // 退出游戏
-    void waitForEnter() const;       // 等待用户按回车
-    std::string getSaveFilePath() const;  // 获取存档文件路径
-    bool confirmAction(const std::string& message) const;  // 确认操作
-    //存档数据格式相关
-    std::string serializeAll() const;     // 序列化所有数据
-    bool deserializeAll(const std::string& data);  // 反序列化所有数据
-    public:
+private:
+    Player* m_player;
+    GameState m_state;
+    bool m_runFlag;
+
+    std::unique_ptr<MainMenuUI> uiMain;
+    std::unique_ptr<PlayerInfoUI> uiPlayer;
+    std::unique_ptr<BagUI> uiBag;
+    std::unique_ptr<ForgeUI> uiForge;
+    std::unique_ptr<ShopUI> uiShop;
+    std::unique_ptr<TaskUI> uiTask;
+   // 旧代码：std::unique_ptr<BattleUI> uiBattle;
+    // 替换为（无参构造，启动不传入空player）
+    std::unique_ptr<BattleUI> uiBattle;
+
+    // ========== 新增回血相关 ==========
+    sf::Clock m_healTimer;
+    const float HEAL_CD = 1.0f;   // 每3秒回一次血
+    const int HEAL_NUM = 10;       // 每次恢复3HP
+
+    void initGameNew();
+    void exitGameLogic();
+    std::string serializeAllData() const;
+    bool deserializeAllData(const std::string& dat);
+public:
     GameManager();
     ~GameManager();
-    //游戏主循环
-    void run();                      // 游戏主循环入口
-    //菜单显示
-    void showMainMenu();             // 显示主菜单
-    //各功能入口
-    void viewPlayerInfo();           // 查看角色信息
-    void viewBag();                  // 查看背包
-    void enterForge();               // 进入锻造工坊
-    void enterShop();                // 进入商店
-    void enterTask();                // 进入任务面板
-    void enterBattle();              // 进入战斗系统
-    void saveGame();                 // 存档
-    void loadGame();                 // 读档
-    //存档/读档
-    bool saveToFile(const std::string& filename);   // 保存到文件
-    bool loadFromFile(const std::string& filename); // 从文件读取
-    //游戏状态
+    //SFML事件&渲染
+    void handleSFEvent(sf::Event& ev, sf::RenderWindow& win);
+    void renderAll(sf::RenderWindow& win, sf::Font& font);
+    //界面切换入口
+    void openPlayerInfo();
+    void openBag();
+    void openForge();
+    void openShop();
+    void openTask();
+    void openBattle();
+    void doSave();
+    void doLoad();
+    //存档IO
+    bool saveToFile(const std::string& path);
+    bool loadFromFile(const std::string& path);
+    //状态
+    void setState(GameState s);
     GameState getState() const;
-    void setState(GameState state);
-    //玩家访问
     Player* getPlayer() const;
 };
-
-#endif // GAME_MANAGER_H
+#endif
