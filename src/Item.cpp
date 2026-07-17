@@ -1,274 +1,167 @@
 #include "Item.h"
 #include "Player.h"
-#include <iostream>
-#include <algorithm>
-
-//Item 基类实现
-Item::Item(const std::string& name, ItemType type, int quantity)
-    : m_name(name), m_type(type), m_quantity(quantity), m_description(""), m_enhanceLevel(0) {}
-
-//Getter实现
-std::string Item::getName() const 
+Item::Item(const std::wstring& name, ItemType type, int qty)
+    : m_name(name), m_type(type), m_quantity(qty), m_enhanceLevel(0)
+{}
+std::wstring Item::getName() const { return m_name; }
+Item::ItemType Item::getType() const { return m_type; }
+int Item::getQuantity() const { return m_quantity; }
+std::wstring Item::getDescription() const { return m_description; }
+int Item::getEnhanceLevel() const { return m_enhanceLevel; }
+void Item::setQuantity(int q) { m_quantity = q; }
+void Item::addQuantity(int q) { m_quantity += q; if(m_quantity < 0) m_quantity = 0; }
+void Item::setDescription(const std::wstring& d) { m_description = d; }
+void Item::setEnhanceLevel(int lvl)
 {
-    return m_name;
+    if(lvl < 0) m_enhanceLevel = 0;
+    else if(lvl > 10) m_enhanceLevel = 10;
+    else m_enhanceLevel = lvl;
 }
-Item::ItemType Item::getType() const 
+void Item::addEnhanceLevel(int delta) { setEnhanceLevel(m_enhanceLevel + delta); }
+bool Item::isEnhanceable() const { return false; }
+std::wstring Item::getDisplayText() const
 {
-    return m_type;
+    std::wstringstream ss;
+    ss << m_name << L" ×" << std::to_wstring(m_quantity);
+    if(m_enhanceLevel > 0) ss << L" +" << std::to_wstring(m_enhanceLevel);
+    if(!m_description.empty()) ss << L" | " << m_description;
+    return ss.str();
 }
-int Item::getQuantity() const 
+// Food
+Food::Food(const std::wstring& name, int qty, int hp, int atk, int def)
+    : Item(name, FOOD, qty), m_hpBonus(hp), m_atkBonus(atk), m_defBonus(def)
+{}
+void Food::use(Player* p)
 {
-    return m_quantity;
-}
-std::string Item::getDescription() const 
-{
-    return m_description;
-}
-int Item::getEnhanceLevel() const 
-{
-    return m_enhanceLevel;
-}
-
-//Setter实现
-void Item::setQuantity(int qty) 
-{
-    m_quantity=qty;
-}
-
-void Item::addQuantity(int qty) 
-{
-    m_quantity+=qty;
-    if (m_quantity<0) m_quantity=0;
-}
-
-void Item::setDescription(const std::string& desc) 
-{
-    m_description=desc;
-}
-
-//设置强化等级
-void Item::setEnhanceLevel(int level) 
-{
-    if (level<0) 
-    {
-        m_enhanceLevel=0;
-    }
-    else if (level>10) 
-    {
-        m_enhanceLevel=10;
-    } 
-    else 
-    {
-        m_enhanceLevel=level;
-    }
-}
-
-//增加强化等级
-void Item::addEnhanceLevel(int delta) 
-{
-    setEnhanceLevel(m_enhanceLevel+delta);
-}
-
-//判断物品是否可强化
-bool Item::isEnhanceable() const 
-{
-    return (m_type==WEAPON||m_type==ARMOR);
-}
-
-void Item::use(Player* player) 
-{
-    std::cout << "不能直接使用该物品！" << std::endl;
-}
-
-//显示物品信息
-void Item::display() const 
-{
-    std::cout<<"物品: "<<m_name<<" | 数量: "<< m_quantity<<" | 描述: "<<m_description;
-    if (isEnhanceable()&& m_enhanceLevel>0) 
-    {
-        std::cout<<" | 强化等级: +"<< m_enhanceLevel;
-    }
-    std::cout<<std::endl;
-}
-//Food 食物类实现
-Food::Food(const std::string& name, int quantity, int hpBonus, int attackBonus, int defenseBonus)
-    : Item(name, FOOD, quantity),m_hpBonus(hpBonus),m_attackBonus(attackBonus),m_defenseBonus(defenseBonus) {}
-
-void Food::use(Player* player) 
-{
-    if (!player) return;
-    if (m_quantity<=0) 
-    {
-        std::cout << m_name << " 数量不足！" << std::endl;
-        return;
-    }
-
-    // 永久增加属性
-    if (m_hpBonus>0) 
-    {
-        player->setMaxHP(player->getMaxHP()+m_hpBonus);
-        player->healHP(m_hpBonus);
-        std::cout << " 最大生命值永久 +" << m_hpBonus << "！" << std::endl;
-    }
-    if (m_attackBonus > 0) 
-    {
-        std::cout << " 攻击力永久 +" << m_attackBonus << "！" << std::endl;
-    }
-    if (m_defenseBonus > 0) 
-    {
-        std::cout << " 防御力永久 +" << m_defenseBonus << "！" << std::endl;
-    }
-
+    if(m_quantity <= 0) return;
+    if(m_hpBonus > 0) p->setMaxHP(p->getMaxHP() + m_hpBonus), p->healHP(m_hpBonus);
+    if(m_atkBonus > 0) p->addBaseAttack(m_atkBonus);
+    if(m_defBonus > 0) p->addBaseDefense(m_defBonus);
     m_quantity--;
 }
-
-void Food::display() const 
+std::wstring Food::getDisplayText() const
 {
-    std::cout << "[食物] " << m_name<< " | 数量: " << m_quantity<< " | 最大HP+" << m_hpBonus<< " | 攻击+" << m_attackBonus<< " | 防御+" << m_defenseBonus<< " | " << m_description << std::endl;
+    std::wstringstream ss;
+    ss << L"[食物] " << Item::getDisplayText();
+    ss << L" HP+" << std::to_wstring(m_hpBonus) << L" ATK+" << std::to_wstring(m_atkBonus) << L" DEF+" << std::to_wstring(m_defBonus);
+    return ss.str();
 }
-
 int Food::getHpBonus() const { return m_hpBonus; }
-int Food::getAttackBonus() const { return m_attackBonus; }
-int Food::getDefenseBonus() const { return m_defenseBonus; }
-
-//Weapon 武器类实现
-Weapon::Weapon(const std::string& name, int quantity, int damage): Item(name, WEAPON, quantity), m_baseDamage(damage){}
-
-//显示武器信息
-void Weapon::display() const 
+int Food::getAtkBonus() const { return m_atkBonus; }
+int Food::getDefBonus() const { return m_defBonus; }
+// Weapon
+Weapon::Weapon(const std::wstring& name, int qty, int dmg)
+    : Item(name, WEAPON, qty), m_baseDamage(dmg)
+{}
+void Weapon::use(Player* p) { p->equipWeapon(this); }
+std::wstring Weapon::getDisplayText() const
 {
-    std::cout << "[武器] " << m_name;
-    if (m_enhanceLevel > 0)
+    std::wstringstream ss;
+    ss << L"[武器] " << Item::getDisplayText() << L" 攻击:" << std::to_wstring(getDamage());
+    return ss.str();
+}
+int Weapon::getBaseDamage() const { return m_baseDamage; }
+int Weapon::getEnhanceDmg() const
+{
+    int lvl = m_enhanceLevel;
+    if(lvl == 0) return 0;
+    if(lvl <=2) return lvl*2;
+    if(lvl <=5) return 4 + (lvl-2)*3;
+    if(lvl <=8) return 13 + (lvl-5)*4;
+    return 25 + (lvl-8)*5;
+}
+int Weapon::getDamage() const { return m_baseDamage + getEnhanceDmg(); }
+// Armor
+Armor::Armor(const std::wstring& name, int qty, int def)
+    : Item(name, ARMOR, qty), m_baseDef(def)
+{}
+void Armor::use(Player* p) { p->equipArmor(this); }
+std::wstring Armor::getDisplayText() const
+{
+    std::wstringstream ss;
+    ss << L"[防具] " << Item::getDisplayText() << L" 防御:" << std::to_wstring(getDef());
+    return ss.str();
+}
+int Armor::getBaseDef() const { return m_baseDef; }
+int Armor::getEnhanceDef() const { return m_enhanceLevel * 2; }
+int Armor::getDef() const { return m_baseDef + getEnhanceDef(); }
+// Medicine
+Medicine::Medicine(const std::wstring& name, int qty, int heal)
+    : Item(name, MEDICINE, qty), m_healAmount(heal)
+{}
+void Medicine::use(Player* p)
+{
+    if(m_quantity <= 0) return;
+    int restore = p->healHP(m_healAmount);
+    if(restore > 0) m_quantity--;
+}
+std::wstring Medicine::getDisplayText() const
+{
+    std::wstringstream ss;
+    ss << L"[药品] " << Item::getDisplayText() << L" 治疗:" << std::to_wstring(m_healAmount);
+    return ss.str();
+}
+int Medicine::getHealAmt() const { return m_healAmount; }
+// Material
+Material::Material(const std::wstring& name, int qty, Rarity r)
+    : Item(name, MATERIAL, qty), m_rarity(r)
+{}
+void Material::use(Player*) {}
+std::wstring Material::getDisplayText() const
+{
+    std::wstringstream ss;
+    ss << L"[材料] " << Item::getDisplayText() << L" 稀有度:" << getRarityStr();
+    return ss.str();
+}
+Material::Rarity Material::getRarity() const { return m_rarity; }
+std::wstring Material::getRarityStr() const
+{
+    switch(m_rarity)
     {
-        std::cout << " +" << m_enhanceLevel;
-    }
-    std::cout << " | 攻击: " << getDamage() 
-              << " (基础" << m_baseDamage << " + 强化" << getEnhanceDamage() << ")"
-              << " | " << m_description << std::endl;
-}
-
-int Weapon::getDamage() const 
-{
-    return m_baseDamage + getEnhanceDamage();
-}
-
-//计算强化带来的攻击加成
-int Weapon::getEnhanceDamage() const 
-{
-    if (m_enhanceLevel == 0) return 0;
-    if (m_enhanceLevel <= 2) return m_enhanceLevel * 2;
-    if (m_enhanceLevel <= 5) return 4 + (m_enhanceLevel - 2) * 3;
-    if (m_enhanceLevel <= 8) return 13 + (m_enhanceLevel - 5) * 4;
-    return 25 + (m_enhanceLevel - 8) * 5;
-}
-
-void Weapon::use(Player* player) 
-{
-    if (!player) return;
-    // 直接装备武器
-    player->equipWeapon(this);
-}
-
-//Armor 防具类实现
-Armor::Armor(const std::string& name, int quantity, int defense)
-    : Item(name, ARMOR, quantity), m_baseDefense(defense){}
-
-//显示防具信息
-void Armor::display() const 
-{
-    std::cout << "[防具] " << m_name;
-    if (m_enhanceLevel > 0) 
-    {
-        std::cout << " +" << m_enhanceLevel;
-    }
-    std::cout << " | 防御: " << getDefense() 
-              << " (基础" << m_baseDefense << " + 强化" << getEnhanceDefense() << ")"
-              << " | " << m_description << std::endl;
-}
-//获取当前防御力
-int Armor::getDefense() const 
-{
-    return m_baseDefense + getEnhanceDefense();
-}
-
-int Armor::getEnhanceDefense() const 
-{
-    return m_enhanceLevel * 2;
-}
-
-void Armor::use(Player* player) 
-{
-    if (!player) return;
-    // 直接装备防具
-    player->equipArmor(this);
-}
-
-//Medicine 药品类实现
-Medicine::Medicine(const std::string& name, int quantity, int healAmount)
-    : Item(name, MEDICINE, quantity), m_healAmount(healAmount){}
-//使用药品,恢复生命值
-void Medicine::use(Player* player) 
-{
-    if (!player) return;
-    if (m_quantity <= 0) 
-    {
-        std::cout << m_name << " 数量不足！" << std::endl;
-        return;
-    }
-
-    int actualHeal = player->healHP(m_healAmount);
-    if (actualHeal > 0) {
-        std::cout << "使用 " << m_name << "，恢复 " << actualHeal << " HP！" << std::endl;
-        m_quantity--;
-    } else 
-    {
-        std::cout << " HP已满，无需使用 " << m_name << std::endl;
+        case COMMON: return L"普通";
+        case UNCOMMON: return L"稀有";
+        case RARE: return L"罕见";
+        case EPIC: return L"史诗";
+        case LEGENDARY: return L"传说";
+        default: return L"未知";
     }
 }
-
-//显示药品信息
-void Medicine::display() const 
+bool Material::canMerge(const Material& other) const { return m_rarity == other.m_rarity; }
+// 物品克隆
+Item* cloneItem(const Item* src)
 {
-    std::cout << "[药品] " << m_name 
-              << " | 数量: " << m_quantity 
-              << " | 治疗量: " << m_healAmount;
-    std::cout << " | " << m_description << std::endl;
-}
-
-int Medicine::getHealAmount() const {
-    return m_healAmount;
-}
-//Material 材料类实现
-Material::Material(const std::string& name, int quantity, MaterialRarity rarity)
-    : Item(name, MATERIAL, quantity), m_rarity(rarity){}
-//显示材料信息
-void Material::display() const 
-{
-    std::cout << "[材料] " << m_name 
-              << " | 数量: " << m_quantity 
-              << " | 稀有度: " << getRarityString() 
-              << " | " << m_description << std::endl;
-}
-
-Material::MaterialRarity Material::getRarity() const 
-{
-    return m_rarity;
-}
-
-//获取稀有度的中文名称,用于界面显示
-std::string Material::getRarityString() const 
-{
-    switch(m_rarity) 
+    if(!src) return nullptr;
+    switch(src->getType())
     {
-        case COMMON:    return "普通";
-        case UNCOMMON:  return "稀有";
-        case RARE:      return "罕见";
-        case EPIC:      return "史诗";
-        case LEGENDARY: return "传说";
-        default:        return "未知";
+        case Item::FOOD:
+        {
+            auto f = dynamic_cast<const Food*>(src);
+            return new Food(f->getName(), f->getQuantity(), f->getHpBonus(), f->getAtkBonus(), f->getDefBonus());
+        }
+        case Item::WEAPON:
+        {
+            auto w = dynamic_cast<const Weapon*>(src);
+            auto nw = new Weapon(w->getName(), w->getQuantity(), w->getBaseDamage());
+            nw->setEnhanceLevel(w->getEnhanceLevel());
+            return nw;
+        }
+        case Item::ARMOR:
+        {
+            auto a = dynamic_cast<const Armor*>(src);
+            auto na = new Armor(a->getName(), a->getQuantity(), a->getBaseDef());
+            na->setEnhanceLevel(a->getEnhanceLevel());
+            return na;
+        }
+        case Item::MEDICINE:
+        {
+            auto m = dynamic_cast<const Medicine*>(src);
+            return new Medicine(m->getName(), m->getQuantity(), m->getHealAmt());
+        }
+        case Item::MATERIAL:
+        {
+            auto mat = dynamic_cast<const Material*>(src);
+            return new Material(mat->getName(), mat->getQuantity(), mat->getRarity());
+        }
+        default: return nullptr;
     }
-}
-bool Material::canCraftWith(const Material& other) const 
-{
-    return m_rarity == other.m_rarity;
 }
