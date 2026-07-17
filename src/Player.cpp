@@ -1,480 +1,293 @@
 #include "Player.h"
-#include "Task.h"        // TaskManager 的实现需要
-#include "Bag.h"            
-#include "Shop.h"        
-#include "ForgeManager.h"   
-#include <iostream>
+#include "Bag.h"
+#include "Shop.h"
+#include "Task.h"
+#include "ForgeManager.h"
+#include "Item.h"
 #include <sstream>
-#include <iomanip>
+#include <algorithm>
+#include <algorithm>
+#include <codecvt>
+#include <locale>
+#include <cwchar>
 
-Player::Player(const std::string& name)
-    : m_name(name),
-      m_level(1),           // 初始等级为1
-      m_hp(50),             // 初始生命值50
-      m_maxHP(50),          // 初始最大生命值50
-      m_baseAttack(5),      // 初始攻击
-      m_baseDefense(2),     // 初始防御
-      m_speed(3),           // 初始速度
-      m_exp(0),             // 初始经验值0
-      m_gold(100),          // 初始金币100
-      m_bag(nullptr),
-      m_shop(nullptr),
-      m_taskManager(nullptr),
-      m_forgeManager(nullptr),
-      m_equippedWeapon(nullptr),
-      m_equippedArmor(nullptr)
+// UTF8 宽字符互转，彻底解决中文方框乱码
+static std::string WstrToUtf8(const std::wstring& wstr)
+{
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+    return conv.to_bytes(wstr);
+}
+static std::wstring Utf8ToWstr(const std::string& str)
+{
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+    return conv.from_bytes(str);
+}
+// 逗号转义，防止分割错乱
+static std::string escapeComma(const std::wstring& wstr)
+{
+    std::wstring temp = wstr;
+    for (wchar_t& c : temp)
+        if (c == L',') c = L'#';
+    return WstrToUtf8(temp);
+}
+static std::wstring unescapeComma(const std::string& s)
+{
+    std::wstring temp = Utf8ToWstr(s);
+    for (wchar_t& c : temp)
+        if (c == L'#') c = L',';
+    return temp;
+}
 
-    {
-    // 创建子系统
-    m_bag = new Bag(name + "的背包", 20);
-    m_shop = new Shop(this);  // 创建商店
-    // 任务管理器需要 Player 指针，所以传 this
-    m_taskManager = new TaskManager(this);
-    // 锻造工坊需要 Player 指针，所以传 this
-    m_forgeManager = new ForgeManager(this);
-    std::cout << " 欢迎 " << m_name << " 来到校园RPG世界！" << std::endl;
-    }
-Player::~Player() 
+Player::Player(const std::wstring& name)
+    : m_name(name), m_level(1), m_hp(50), m_maxHP(50),
+    m_baseAtk(5), m_baseDef(2), m_speed(3), m_exp(0), m_gold(100),
+    m_equipWep(nullptr), m_equipArm(nullptr)
+{
+    m_bag = new Bag(name + L"背包", 100);
+    m_shop = new Shop(this);
+    m_taskMgr = new TaskManager(this);
+    m_forge = new ForgeManager(this);
+     // 赠送运动护腕
+    std::shared_ptr<Weapon> giftWeapon = std::make_shared<Weapon>(L"手套", 1, 5);
+    m_bag->addItem(giftWeapon);
+
+    // 新增一件新手防具示例（护甲+3）
+    std::shared_ptr<Armor> giftArmor = std::make_shared<Armor>(L"校服外套", 1, 3);
+    m_bag->addItem(giftArmor);
+}
+Player::~Player()
 {
     delete m_bag;
     delete m_shop;
-    delete m_taskManager;
-    delete m_forgeManager;
-    std::cout << m_name << " 已离开游戏。" << std::endl;
+    delete m_taskMgr;
+    delete m_forge;
 }
-//装备武器
-bool Player::equipWeapon(Weapon* weapon) 
+bool Player::equipWeapon(Weapon* w)
 {
-    if (weapon == nullptr) return false;
-    // 如果已有武器，先卸下（放回背包）
-    if (m_equippedWeapon != nullptr) 
+    if(!w) return false;
+    if(m_equipWep) unequipWeapon();
+    if(m_bag->removeItem(w, false))
     {
-        unequipWeapon();
-    }
-    // 从背包中移除武器（注意：需要根据指针移除，不是根据名称）
-    if (m_bag->removeItem(weapon)) 
-    {
-        m_equippedWeapon = weapon;
-        std::cout << "装备了 " << weapon->getName() << std::endl;
+        m_equipWep = w;
         return true;
     }
-
-    std::cout << " 武器不在背包中，无法装备" << std::endl;
     return false;
 }
-//装备防具
-bool Player::equipArmor(Armor* armor) 
+bool Player::equipArmor(Armor* a)
 {
-    if (armor == nullptr) 
+    if(!a) return false;
+    if(m_equipArm) unequipArmor();
+    if(m_bag->removeItem(a, false))
     {
-        std::cout << " 防具指针为空！" << std::endl;
-        return false;
-    }
-    // 如果已有防具，先卸下（放回背包）
-    if (m_equippedArmor != nullptr) {
-
-        unequipArmor();
-    }
-    // 从背包中移除防具（但不删除对象）
-    if (m_bag->removeItem(armor, false)) 
-    {
-        m_equippedArmor = armor;
-        std::cout << "装备了 " << armor->getName() << std::endl;
+        m_equipArm = a;
         return true;
     }
-
-    std::cout << "防具不在背包中，无法装备" << std::endl;
     return false;
 }
-//卸下武器
-void Player::unequipWeapon() 
+void Player::unequipWeapon()
 {
-    if (m_equippedWeapon == nullptr) 
+    if(!m_equipWep) return;
+    if(m_bag->addItem(m_equipWep)) m_equipWep = nullptr;
+}
+void Player::unequipArmor()
+{
+    if(!m_equipArm) return;
+    if(m_bag->addItem(m_equipArm)) m_equipArm = nullptr;
+}
+std::wstring Player::getName() const { return m_name; }
+int Player::getLevel() const { return m_level; }
+int Player::getHP() const { return m_hp; }
+int Player::getMaxHP() const { return m_maxHP; }
+int Player::getBaseAttack() const { return m_baseAtk; }
+int Player::getBaseDefense() const { return m_baseDef; }
+int Player::getSpeed() const { return m_speed; }
+int Player::getExp() const { return m_exp; }
+int Player::getGold() const { return m_gold; }
+Weapon* Player::getEquipWep() const { return m_equipWep; }
+Armor* Player::getEquipArm() const { return m_equipArm; }
+int Player::getTotalAtk() const
+{
+    int w = m_equipWep ? m_equipWep->getDamage() : 0;
+    return m_baseAtk + w;
+}
+int Player::getTotalDef() const
+{
+    int a = m_equipArm ? m_equipArm->getDef() : 0;
+    return m_baseDef + a;
+}
+int Player::getExpNext() const { return expNeed(m_level); }
+void Player::setName(const std::wstring& n) { m_name = n; }
+void Player::setLevel(int l) { if(l<1) l=1; if(l>100) l=100; m_level=l; }
+void Player::setHP(int hp) { if(hp<0)hp=0; if(hp>m_maxHP)hp=m_maxHP; m_hp=hp; }
+void Player::setMaxHP(int hp) { if(hp<1)hp=1; m_maxHP=hp; if(m_hp>m_maxHP)m_hp=m_maxHP; }
+void Player::setBaseAttack(int v) { if(v<0)v=0; m_baseAtk=v; }
+void Player::setBaseDefense(int v) { if(v<0)v=0; m_baseDef=v; }
+void Player::setSpeed(int v) { if(v<0)v=0; m_speed=v; }
+void Player::setExp(int e) { if(e<0)e=0; m_exp=e; }
+void Player::setGold(int g) { if(g<0)g=0; m_gold=g; }
+void Player::addBaseAttack(int v)
+{
+    if (v < 0) v = 0;
+    m_baseAtk += v;
+}
+
+void Player::addBaseDefense(int v)
+{
+    if (v < 0) v = 0;
+    m_baseDef += v;
+}
+void Player::addExp(int amt)
+{
+    if(amt <=0) return;
+    m_exp += amt;
+    while(canLevelUp()) levelUp();
+    m_taskMgr->onEvent(ConditionType::ReachLevel, m_level, 1);
+}
+bool Player::addGold(int amt)
+{
+    if(amt >=0)
     {
-        std::cout << "当前没有装备武器" << std::endl;
-        return;
-    }
-    // 放回背包
-    if (m_bag->addItem(m_equippedWeapon)) 
-    {
-        std::cout << "卸下了 " << m_equippedWeapon->getName() << std::endl;
-        m_equippedWeapon = nullptr;
-    } 
-    else 
-    {
-        std::cout << " 背包已满，无法卸下！" << std::endl;
-    }
-}
-//卸下防具
-void Player::unequipArmor() 
-{
-    if (m_equippedArmor == nullptr) 
-    {
-        std::cout << " 当前没有装备防具" << std::endl;
-        return;
-    }
-    // 放回背包
-    if (m_bag->addItem(m_equippedArmor)) 
-    {
-        std::cout << " 卸下了 " << m_equippedArmor->getName() << std::endl;
-        m_equippedArmor = nullptr;
-    } 
-    else 
-    {
-        std::cout << " 背包已满，无法卸下防具！" << std::endl;
-    }
-}
-// Getter 实现
-std::string Player::getName() const 
-{
-    return m_name;
-}
-int Player::getLevel() const 
-{
-    return m_level;
-}
-int Player::getHP() const 
-{
-    return m_hp;
-}
-int Player::getMaxHP() const 
-{
-    return m_maxHP;
-}
-int Player::getBaseAttack() const 
-{
-    return m_baseAttack;
-}
-int Player::getBaseDefense() const 
-{
-    return m_baseDefense;
-}
-int Player::getSpeed() const 
-{
-    return m_speed;
-}
-int Player::getTotalAttack() const 
-{
-    int weaponDamage = 0;
-    if (m_equippedWeapon != nullptr) 
-    {
-        weaponDamage = m_equippedWeapon->getDamage();
-    }
-    return m_baseAttack + weaponDamage;
-}
-int Player::getTotalDefense() const 
-{
-    int armorDefense = 0;
-    if (m_equippedArmor != nullptr)
-    {
-        armorDefense = m_equippedArmor->getDefense();
-    }
-    return m_baseDefense + armorDefense;
-}
-int Player::getExp() const 
-{
-    return m_exp;
-}
-
-//获取升级所需经验值
-int Player::getExpToNextLevel() const 
-{
-    return getExpRequired(m_level);
-}
-//获取金币数
-int Player::getGold() const 
-{
-    return m_gold;
-}
-
-// Setter 实现
-void Player::setName(const std::string& name) 
-{
-    m_name = name;
-}
-
-void Player::setLevel(int level) 
-{
-    if (level < 1) level = 1;
-    if (level > 100) level = 100;
-    m_level = level;
-}
-
-//设置生命值
-void Player::setHP(int hp) 
-{
-    if (hp < 0) hp = 0;
-    if (hp > m_maxHP) hp = m_maxHP;
-    m_hp = hp;
-}
-
-void Player::setMaxHP(int maxHP) 
-{
-    if (maxHP < 1) maxHP = 1;
-    m_maxHP = maxHP;
-    // 如果当前生命值超过新的最大值，自动调整
-    if (m_hp > m_maxHP) 
-    {
-        m_hp = m_maxHP;
-    }
-}
-void Player::setBaseAttack(int val) 
-{
-    if (val < 0) val = 0;
-    m_baseAttack = val;
-}
-
-void Player::setBaseDefense(int val) 
-{
-    if (val < 0) val = 0;
-    m_baseDefense = val;
-}
-
-void Player::setSpeed(int val) 
-{
-    if (val < 0) val = 0;
-    m_speed = val;
-}
-
-void Player::addBaseAttack(int val) 
-{
-    m_baseAttack += val;
-    if (m_baseAttack < 0) m_baseAttack = 0;
-}
-
-void Player::addBaseDefense(int val) 
-{
-    m_baseDefense += val;
-    if (m_baseDefense < 0) m_baseDefense = 0;
-}
-
-void Player::addSpeed(int val) 
-{
-    m_speed += val;
-    if (m_speed < 0) m_speed = 0;
-}
-void Player::setExp(int exp) 
-{
-    if (exp < 0) exp = 0;
-    m_exp = exp;
-}
-
-void Player::setGold(int gold) 
-{
-    if (gold < 0) gold = 0;
-    m_gold = gold;
-}
-
-// 属性操作
-//增加经验值
-void Player::addExp(int amount) 
-{
-    if (amount <= 0) return;
-    m_exp += amount;
-    std::cout << " 获得 " << amount << " 经验值！" << std::endl;
-    // 循环检查升级（可能连续升级）
-    while (canLevelUp()) 
-    {
-        levelUp();
-    }
-    // 通知任务系统：等级达到事件
-    if (m_taskManager) 
-    {
-        m_taskManager->onEvent(ConditionType::ReachLevel, m_level, 1);
-    }
-}
-
-//增加金币
-bool Player::addGold(int amount) 
-{
-    if (amount >= 0) {
-
-        // 增加金币
-        m_gold += amount;
-        if (amount > 0)
-        {
-            std::cout << " 获得 " << amount << " 金币！" << std::endl;
-        }
-         if (m_taskManager) 
-        {
-            m_taskManager->onEvent(ConditionType::HaveGold, m_gold, 1);
-        }
-        return true;
-    } 
-    else 
-    {
-        // 扣除金币
-        int need = -amount;
-        if (m_gold < need) 
-        {
-            std::cout << " 金币不足！需要 " << need << "，当前 " << m_gold << std::endl;
-            return false;
-        }
-        m_gold -= need;
-        std::cout << " 消耗 " << need << " 金币" << std::endl;
-        if (m_taskManager) 
-        {
-            m_taskManager->onEvent(ConditionType::HaveGold, m_gold, 1);
-        }
+        m_gold += amt;
+        m_taskMgr->onEvent(ConditionType::HaveGold, m_gold, 1);
         return true;
     }
+    int cost = -amt;
+    if(m_gold < cost) return false;
+    m_gold -= cost;
+    m_taskMgr->onEvent(ConditionType::HaveGold, m_gold, 1);
+    return true;
 }
-
-//恢复生命值
-int Player::healHP(int amount) 
+int Player::healHP(int amt)
 {
-    if (amount <= 0) return 0;
-    
-    int oldHP = m_hp;
-    m_hp += amount;
-    if (m_hp > m_maxHP) 
-    {
-        m_hp = m_maxHP;
-    }
-    int actualHeal = m_hp - oldHP;
-    
-    if (actualHeal > 0)
-    {
-        std::cout << " 恢复生命值 +" << actualHeal << " (当前 " << m_hp << "/" << m_maxHP << ")" << std::endl;
-    }
-    return actualHeal;
+    if(amt <=0) return 0;
+    int old = m_hp;
+    m_hp += amt;
+    if(m_hp > m_maxHP) m_hp = m_maxHP;
+    return m_hp - old;
 }
-//受到伤害
-int Player::takeDamage(int damage) 
+int Player::takeDmg(int dmg)
 {
-    if (damage <= 0) return 0;
-    int oldHP = m_hp;
-    m_hp -= damage;
-    if (m_hp < 0)
-    {
-        m_hp = 0;
-    }
-    int actualDamage = oldHP - m_hp;
-    if (actualDamage > 0)
-    {
-        std::cout << " 受到伤害 -" << actualDamage << " (剩余 " << m_hp << "/" << m_maxHP << ")" << std::endl;
-    }
-    return actualDamage;
+    if(dmg <=0) return 0;
+    int old = m_hp;
+    m_hp -= dmg;
+    if(m_hp <0) m_hp=0;
+    return old - m_hp;
 }
-
-//完全恢复
-void Player::fullRestore() 
+void Player::fullRestore() { m_hp = m_maxHP; }
+int Player::expNeed(int lvl) { return lvl * 50 + 20; }
+bool Player::canLevelUp() const { return m_exp >= expNeed(m_level); }
+void Player::levelUp()
 {
-    m_hp = m_maxHP;
-    std::cout << " 生命值已完全恢复！ (" << m_hp << "/" << m_maxHP << ")" << std::endl;
-}
-// 升级相关
-int Player::getExpRequired(int level) 
-{
-    return level * 50 + 20;
-}
-//检查是否可以升级
-bool Player::canLevelUp() const 
-{
-    return m_exp >= getExpRequired(m_level);
-}
-//升级
-void Player::levelUp() 
-{
-    // 1. 扣除经验值
-    int required = getExpRequired(m_level);
-    m_exp -= required;
-    // 2. 等级提升
+    int req = expNeed(m_level);
+    m_exp -= req;
     m_level++;
-    // 3. 最大生命值提升（每级+10）
-    m_maxHP += 10;
-    // 4. 生命值完全恢复
-    m_hp = m_maxHP;m_baseAttack += 2;
-    m_baseDefense += 1;
-    m_speed += 1;
+    m_maxHP +=10;
+    m_hp = m_maxHP;
+    m_baseAtk +=2;
+    m_baseDef +=1;
+    m_speed +=1;
 }
-// 子系统访问
-Bag* Player::getBag() const 
+Bag* Player::getBag() const { return m_bag; }
+Shop* Player::getShop() const { return m_shop; }
+TaskManager* Player::getTaskManager() const { return m_taskMgr; }
+ForgeManager* Player::getForge() const { return m_forge; }
+std::wstring Player::getInfoText() const
 {
-    return m_bag;
-}
-TaskManager* Player::getTaskManager() const 
-{
-    return m_taskManager;
+    std::wstringstream ss;
+    ss << L"角色：" << m_name << L"\n"
+    << L"等级：" << std::to_wstring(m_level) << L"\n"
+    << L"生命：" << std::to_wstring(m_hp) << L"/" << std::to_wstring(m_maxHP) << L"\n"
+    << L"经验：" << std::to_wstring(m_exp) << L"/" << std::to_wstring(getExpNext()) << L"\n"
+    << L"金币：" << std::to_wstring(m_gold) << L"\n"
+    << L"总攻击：" << std::to_wstring(getTotalAtk()) << L"(基础" << std::to_wstring(m_baseAtk) << L")\n"
+    << L"总防御：" << std::to_wstring(getTotalDef()) << L"(基础" << std::to_wstring(m_baseDef) << L")\n"
+    << L"速度：" << std::to_wstring(m_speed);
+    if(m_equipWep) ss << L"\n装备武器：" << m_equipWep->getName();
+    if(m_equipArm) ss << L"\n装备防具：" << m_equipArm->getName();
+    return ss.str();
 }
 
-ForgeManager* Player::getForgeManager() const 
+std::string Player::serialize() const
 {
-    return m_forgeManager;
-}
-// 显示方法
-void Player::displayInfo() const 
-{
-    std::cout << "\n";
-    std::cout << "╔═══════════════════════════════════════════════════════╗\n";
-    std::cout << "║                    👤 角色信息                        ║\n";
-    std::cout << "╚═══════════════════════════════════════════════════════╝\n";
-    std::cout << "  角色名称: " << m_name << "\n";
-    std::cout << "  等级: " << m_level << "\n";
-    std::cout << "  生命值: " << m_hp << " / " << m_maxHP << "\n";
-    std::cout << "  经验值: " << m_exp << " / " << getExpRequired(m_level) << "\n";
-    std::cout << "  金币: " << m_gold << "\n";
-    std::cout << "  攻击力: " << getTotalAttack() << " (基础 " << m_baseAttack << " + 武器 " << (getTotalAttack() - m_baseAttack) << ")\n";
-    std::cout << "  防御力: " << getTotalDefense() << " (基础 " << m_baseDefense << " + 防具 " << (getTotalDefense() - m_baseDefense) << ")\n";
-    std::cout << "  速度: " << m_speed << "\n";
-    std::cout << "═══════════════════════════════════════════════════════\n";
-}
+    std::string nameStr = escapeComma(m_name);
+    std::wstring equipWName = m_equipWep ? m_equipWep->getName() : L"";
+    std::wstring equipAName = m_equipArm ? m_equipArm->getName() : L"";
+    std::string wStr = escapeComma(equipWName);
+    std::string aStr = escapeComma(equipAName);
 
-// 序列化（存档/读档）
-std::string Player::serialize() const 
-{
-    std::ostringstream oss;
-    oss << m_name << ","
-        << m_level << ","
-        << m_hp << ","
-        << m_maxHP << ","
-        << m_exp << ","
-        << m_gold;
-    return oss.str();
+    std::stringstream ss;
+    ss << nameStr << ","
+       << m_level << ","
+       << m_hp << ","
+       << m_maxHP << ","
+       << m_exp << ","
+       << m_gold << ","
+       << m_baseAtk << ","
+       << m_baseDef << ","
+       << m_speed << ","
+       << wStr << ","
+       << aStr;
+    return ss.str();
 }
-//反序列化玩家数据
 bool Player::deserialize(const std::string& data)
 {
     if (data.empty()) return false;
-    
-    std::stringstream ss(data);
-    std::string token;
     std::vector<std::string> parts;
-    // 按逗号分割
-    while (std::getline(ss, token, ','))
+    std::stringstream ss(data);
+    std::string buf;
+    while(std::getline(ss, buf, ',')) parts.push_back(buf);
+    // 现在至少11段：名字,lv,hp,maxhp,exp,gold,atk,def,speed,weapon,armor
+    if(parts.size() < 11) return false;
+    try
     {
-        parts.push_back(token);
-    }
-    // 检查字段数量
-    if (parts.size() < 9) 
-    {
-        std::cout << " 玩家数据格式错误！" << std::endl;
-        return false;
-    }
-    try {
-        m_name = parts[0];
+        m_name = unescapeComma(parts[0]);
         m_level = std::stoi(parts[1]);
         m_hp = std::stoi(parts[2]);
         m_maxHP = std::stoi(parts[3]);
         m_exp = std::stoi(parts[4]);
         m_gold = std::stoi(parts[5]);
-        
-        // 数据校验
-        if (m_level < 1) m_level = 1;
-        if (m_maxHP < 1) m_maxHP = 50;
-        if (m_hp < 0) m_hp = 0;
-        if (m_hp > m_maxHP) m_hp = m_maxHP;
-        if (m_exp < 0) m_exp = 0;
-        if (m_gold < 0) m_gold = 0;
-        if (m_baseAttack < 0) m_baseAttack = 0;
-        if (m_baseDefense < 0) m_baseDefense = 0;
-        if (m_speed < 0) m_speed = 0;
-        
+        m_baseAtk = std::stoi(parts[6]);
+        m_baseDef = std::stoi(parts[7]);
+        m_speed = std::stoi(parts[8]);
+        std::wstring equipWName = unescapeComma(parts[9]);
+        std::wstring equipAName = unescapeComma(parts[10]);
+
+        setLevel(m_level);
+        setHP(m_hp);
+        setMaxHP(m_maxHP);
+        setExp(m_exp);
+        setGold(m_gold);
+        setBaseAttack(m_baseAtk);
+        setBaseDefense(m_baseDef);
+        setSpeed(m_speed);
+
+        // 自动重新穿戴装备
+        m_equipWep = nullptr;
+        m_equipArm = nullptr;
+        Bag* bag = getBag();
+        if (!equipWName.empty())
+        {
+            for (auto w : bag->getWeapons())
+            {
+                if (w->getName() == equipWName)
+                {
+                    equipWeapon(w);
+                    break;
+                }
+            }
+        }
+        if (!equipAName.empty())
+        {
+            for (auto a : bag->getArmors())
+            {
+                if (a->getName() == equipAName)
+                {
+                    equipArmor(a);
+                    break;
+                }
+            }
+        }
         return true;
-    } 
-    catch (const std::exception& e)
-    {
-        std::cout << "玩家数据解析失败：" << e.what() << std::endl;
-        return false;
     }
+    catch(...) { return false; }
 }
